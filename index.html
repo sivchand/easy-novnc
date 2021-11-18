@@ -145,7 +145,7 @@
         function prependPath() {
             var addr = 'vnc';
             var pathname = document.location.pathname;
-            addr = pathname.replace(/^(\/)+/, "").replace(/(\w+)(\.*\w+)+$/, "") + addr;
+            addr = pathname.replace(/^(\/)+/, "") + addr;
             path.value = addr;
         }
 
