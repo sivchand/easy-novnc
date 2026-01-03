@@ -1,4 +1,4 @@
-// +build novnc_generate
+//go:build novnc_generate
 
 package main
 
@@ -8,28 +8,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/shurcooL/vfsgen"
 	"github.com/spkg/zipfs"
 )
 
 const noVNCZip = "https://github.com/novnc/noVNC/archive/master.zip"
-const vncScript = `
-	try {
-		function parseQuery(e){for(var o=e.split("&"),n={},t=0;t<o.length;t++){var d=o[t].split("="),p=decodeURIComponent(d[0]),r=decodeURIComponent(d[1]);if(void 0===n[p])n[p]=decodeURIComponent(r);else if("string"==typeof n[p]){var i=[n[p],decodeURIComponent(r)];n[p]=i}else n[p].push(decodeURIComponent(r))}return n};
-		fetch(parseQuery(window.location.search.replace(/^\?/, ""))["path"]).then(function(resp) {
-			return resp.text();
-		}).then(function (txt) {
-			if (txt.indexOf("not websocket") == -1) alert(txt);
-		});
-	} catch (ex) {
-		console.log(ex);
-	}
-`
+const vncScript = ""
 
 func main() {
 	resp, err := http.Get(noVNCZip)
@@ -37,10 +26,11 @@ func main() {
 		panic(err)
 	}
 
-	f, err := ioutil.TempFile("", "novnc*.zip")
+	f, err := os.CreateTemp("", "novnc*.zip")
 	if err != nil {
 		panic(err)
 	}
+	defer os.Remove(f.Name())
 
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
@@ -73,7 +63,28 @@ func main() {
 
 // modifyZip adds the custom easy-novnc code into the noVNC zip file.
 func modifyZip(zf string) error {
-	buf, err := ioutil.ReadFile(zf)
+	newRootName := "noVNC"
+	includePrefixes := []string{
+		"core/",
+		"app/",
+		"po/",
+		"vnc.html",
+		"vendor/",
+		"utils/",
+		"defaults.json",
+		"mandatory.json",
+		"package.json",
+	}
+	shouldInclude := func(relPath string) bool {
+		for _, p := range includePrefixes {
+			if strings.HasPrefix(relPath, p) {
+				return true
+			}
+		}
+		return false
+	}
+
+	buf, err := os.ReadFile(zf)
 	if err != nil {
 		return err
 	}
@@ -92,8 +103,32 @@ func modifyZip(zf string) error {
 	zw := zip.NewWriter(f)
 	defer zw.Close()
 
+	_, err = zw.CreateHeader(&zip.FileHeader{
+		Name:   newRootName + "/",
+		Method: zip.Store,
+	})
+	if err != nil {
+		return err
+	}
+
 	var found bool
 	for _, e := range zr.File {
+		parts := strings.SplitN(e.Name, "/", 2)
+
+		if len(parts) < 2 {
+			continue
+		}
+		relPath := parts[1]
+
+		if !shouldInclude(relPath) {
+			continue
+		}
+
+		newName := filepath.Join(newRootName, relPath)
+		if strings.HasSuffix(e.Name, "/") {
+			newName += "/"
+		}
+
 		var w io.Writer
 
 		rc, err := e.Open()
@@ -101,7 +136,7 @@ func modifyZip(zf string) error {
 			return err
 		}
 
-		fbuf, err := ioutil.ReadAll(rc)
+		fbuf, err := io.ReadAll(rc)
 		if err != nil {
 			return err
 		}
@@ -114,7 +149,7 @@ func modifyZip(zf string) error {
 				return err
 			}
 			w, err = zw.CreateHeader(&zip.FileHeader{
-				Name:          e.Name,
+				Name:          newName,
 				Flags:         e.Flags,
 				Method:        e.Method,
 				Modified:      fi.ModTime(),
@@ -122,7 +157,14 @@ func modifyZip(zf string) error {
 				ExternalAttrs: e.ExternalAttrs,
 			})
 		} else {
-			w, err = zw.CreateHeader(&e.FileHeader)
+			w, err = zw.CreateHeader(&zip.FileHeader{
+				Name:          newName,
+				Flags:         e.Flags,
+				Method:        e.Method,
+				Modified:      e.Modified,
+				Extra:         e.Extra,
+				ExternalAttrs: e.ExternalAttrs,
+			})
 		}
 
 		if err != nil {

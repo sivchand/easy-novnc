@@ -60,7 +60,7 @@
     <div class="wrapper">
         <div class="connect">
             <h3 class="ui dividing header">noVNC</h3>
-            <form action="/vnc.html" method="GET" class="ui form">
+            <form action="vnc.html" method="GET" class="ui form">
                 {{if .arbitraryHosts}}
                 {{if .arbitraryPorts}}
                 <div class="two fields">
@@ -132,7 +132,8 @@
                 <input type="hidden" name="reconnect" id="reconnect" value="true">
                 <input type="hidden" name="show_dot" id="show_dot" value="true">
                 <input type="hidden" name="bell" id="bell" value="false">
-                <input type="hidden" name="view_only" id="view_only" value="{{if .defaultViewOnly}}true{{else}}false{{end}}">
+                <input type="hidden" name="view_only" id="view_only"
+                    value="{{if .defaultViewOnly}}true{{else}}false{{end}}">
                 {{end}}
             </form>
         </div>
@@ -141,6 +142,20 @@
         var path = document.getElementById("path");
         var host = document.getElementById("host");
         var port = document.getElementById("port");
+
+        function prependPath() {
+            var addr = 'vnc';
+            var pathname = document.location.pathname;
+            // Remove all trailing slashes in pathname
+            addr = pathname.replace(/\/?$/, '/') + addr;
+            // Remove all leading slashes in addr
+            addr = addr.replace(/^(\/)+/, "");
+            path.value = addr;
+        }
+
+        document.addEventListener('DOMContentLoaded', (event) => {
+            prependPath();
+        });
 
         function updatePath() {
             var addr = "vnc";
