@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/foxcpp/go-mockdns"
 	"github.com/gorilla/mux"
 )
 
@@ -59,6 +60,26 @@ func TestVNCHandler(t *testing.T) {
 			}
 		}
 	}
+
+	srv, _ := mockdns.NewServerWithLogger(map[string]mockdns.Zone{
+		"10.0.0.1.ip.dns.geek1011.net.": {
+			A: []string{"10.0.0.1"},
+		},
+		"127.0.0.1.ip.dns.geek1011.net.": {
+			A: []string{"127.0.0.1"},
+		},
+		"a.b.c.d.a.b.c.d.ip.dns.geek1011.net.": {
+			AAAA: []string{"a:b:c:d:a:b:c:d"},
+		},
+		"a.b.c.d.a.b.d.d.ip.dns.geek1011.net.": {
+			AAAA: []string{"a:b:c:d:a:b:d:d"},
+		},
+	}, log.New(io.Discard, "", 0), false)
+	defer srv.Close()
+
+	srv.PatchNet(net.DefaultResolver)
+	defer mockdns.UnpatchNet(net.DefaultResolver)
+
 	t.Run("Simple", testCase("http://example.com/vnc", 101, "localhost:5900", "localhost", 5900, false, false, nil, false))
 	t.Run("SimpleBlockHost", testCase("http://example.com/vnc/test", 401, "", "localhost", 5900, false, false, nil, false))
 	t.Run("SimpleBlockHostPort", testCase("http://example.com/vnc/test/1234", 401, "", "localhost", 5900, true, false, nil, false))
@@ -152,13 +173,13 @@ func TestServerHeader(t *testing.T) {
 }
 
 func TestFS(t *testing.T) {
-	d, err := ioutil.TempDir("", "easy-novnc")
+	d, err := os.MkdirTemp("", "easy-novnc")
 	if err != nil {
 		panic(err)
 	}
 	defer os.RemoveAll(d)
 
-	err = ioutil.WriteFile(filepath.Join(d, "test.txt"), []byte("foo"), 0644)
+	err = os.WriteFile(filepath.Join(d, "test.txt"), []byte("foo"), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +189,7 @@ func TestFS(t *testing.T) {
 		panic(err)
 	}
 
-	err = ioutil.WriteFile(filepath.Join(d, "tmp", "test.txt"), []byte("foobar"), 0644)
+	err = os.WriteFile(filepath.Join(d, "tmp", "test.txt"), []byte("foobar"), 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -178,7 +199,7 @@ func TestFS(t *testing.T) {
 
 	fs("tmp", http.Dir(d)).ServeHTTP(w, r)
 
-	buf, _ := ioutil.ReadAll(w.Result().Body)
+	buf, _ := io.ReadAll(w.Result().Body)
 	if !strings.Contains(string(buf), "foo") {
 		if !strings.Contains(string(buf), "foobar") {
 			t.Errorf("serving from wrong subdir, got %#v", string(buf))
@@ -203,7 +224,7 @@ func TestAddPrefix(t *testing.T) {
 			fmt.Fprint(w, r.URL.String())
 		})).ServeHTTP(w, r)
 
-		buf, _ := ioutil.ReadAll(w.Result().Body)
+		buf, _ := io.ReadAll(w.Result().Body)
 		if string(buf) != c[2] {
 			t.Errorf("expected %#v for addPrefix %#v to %#v, got %#v", c[2], c[0], c[1], string(buf))
 		}
@@ -227,7 +248,7 @@ func TestCopyCh(t *testing.T) {
 				} else if shouldError && err == nil {
 					t.Errorf("expected error")
 				}
-				if time.Now().Sub(n) < r.MinTime() {
+				if time.Since(n) < r.MinTime() {
 					t.Errorf("returned too fast")
 				}
 			case <-time.After(time.Second):
@@ -252,6 +273,26 @@ func TestCIDRBlackWhiteList(t *testing.T) {
 			}
 		}
 	}
+
+	srv, _ := mockdns.NewServerWithLogger(map[string]mockdns.Zone{
+		"10.0.0.9.ip.dns.geek1011.net.": {
+			A: []string{"10.0.0.9"},
+		},
+		"1.2.3.4.ip.dns.geek1011.net.": {
+			A: []string{"1.2.3.4"},
+		},
+		"a.b.c.d.a.b.c.d.ip.dns.geek1011.net.": {
+			AAAA: []string{"a:b:c:d:a:b:c:d"},
+		},
+		"a.b.c.d.a.b.d.d.ip.dns.geek1011.net.": {
+			AAAA: []string{"a:b:c:d:a:b:d:d"},
+		},
+	}, log.New(io.Discard, "", 0), false)
+	defer srv.Close()
+
+	srv.PatchNet(net.DefaultResolver)
+	defer mockdns.UnpatchNet(net.DefaultResolver)
+
 	t.Run("WhitelistAllow", testCase(mustParseCIDRList("10.0.0.0/24,127.0.0.0/16"), true, []string{"10.0.0.1", "127.0.1.1", "10.0.0.9.ip.dns.geek1011.net"}, false))
 	t.Run("WhitelistBlock", testCase(mustParseCIDRList("10.0.0.0/24,127.0.0.0/16"), true, []string{"11.0.0.1", "1.0.1.1", "1.2.3.4.ip.dns.geek1011.net"}, true))
 	t.Run("BlacklistAllow", testCase(mustParseCIDRList("10.0.0.0/24,127.0.0.0/16"), false, []string{"11.0.0.1", "1.0.1.1", "1.2.3.4.ip.dns.geek1011.net"}, false))

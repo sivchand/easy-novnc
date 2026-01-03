@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -10,7 +9,7 @@ import (
 )
 
 func TestNoVNC(t *testing.T) {
-	f, err := noVNC.Open("noVNC-master")
+	f, err := noVNC.Open("noVNC")
 	if err != nil {
 		t.Errorf("could not open noVNC root dir: %v", err)
 	}
@@ -20,12 +19,12 @@ func TestNoVNC(t *testing.T) {
 		t.Errorf("could not read noVNC root dir: %v", err)
 	}
 
-	f, err = noVNC.Open("noVNC-master/vnc.html")
+	f, err = noVNC.Open("noVNC/vnc.html")
 	if err != nil {
 		t.Errorf("could not open vnc.html: %v", err)
 	}
 
-	buf, err := ioutil.ReadAll(f)
+	buf, err := io.ReadAll(f)
 	if err != nil {
 		t.Errorf("could not read vnc.html: %v", err)
 	}
@@ -34,12 +33,12 @@ func TestNoVNC(t *testing.T) {
 		t.Errorf("vnc.html is too small")
 	}
 
-	f, err = noVNC.Open("noVNC-master/VERSION")
+	f, err = noVNC.Open("noVNC/package.json")
 	if err != nil {
 		t.Errorf("could not open VERSION: %v", err)
 	}
 
-	buf, err = ioutil.ReadAll(f)
+	buf, err = io.ReadAll(f)
 	if err != nil {
 		t.Errorf("could not read VERSION: %v", err)
 	}

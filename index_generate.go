@@ -1,17 +1,16 @@
-// +build index_generate
+//go:build index_generate
 
 package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
 func main() {
 	fmt.Println("writing index_generated.go")
 
-	buf, err := ioutil.ReadFile("index.html")
+	buf, err := os.ReadFile("index.html")
 	if err != nil {
 		panic(err)
 	}
