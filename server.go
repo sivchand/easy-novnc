@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,11 @@ import (
 
 // https://stackoverflow.com/a/17871737
 var ipv6Regexp = `(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9]))`
+
+type PackageJSON struct {
+	Version string `json:"version"`
+	// You can add other fields like Name string `json:"name"` if needed
+}
 
 func main() {
 	pflag.Usage = func() {
@@ -156,7 +162,25 @@ func main() {
 		})
 	})
 
-	fmt.Printf("Listening on http://%s\n", *addr)
+	file, err := noVNC.Open("noVNC/package.json")
+	if err != nil {
+		logf(true, "Error opening package.json: %v", err)
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		logf(true, "Error reading file content: %v", err)
+	}
+
+	var pkg PackageJSON
+	err = json.Unmarshal(content, &pkg)
+	if err != nil {
+		logf(true, "Error unmarshaling JSON: %v", err)
+	}
+
+	fmt.Printf("noVNC %s Listening on http://%s\n", pkg.Version, *addr)
+
 	if !*arbitraryHosts && !*arbitraryPorts && *host == "localhost" && *port == 5900 && !*basicUI {
 		fmt.Printf("Run with --help for more options\n")
 	}
