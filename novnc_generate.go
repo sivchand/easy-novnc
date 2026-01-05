@@ -17,7 +17,7 @@ import (
 	"github.com/spkg/zipfs"
 )
 
-const noVNCZip = "https://github.com/novnc/noVNC/archive/master.zip"
+const noVNCZip = "https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.zip"
 const vncScript = ""
 
 func main() {
