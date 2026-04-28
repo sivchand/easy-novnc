@@ -17,8 +17,26 @@ import (
 	"github.com/spkg/zipfs"
 )
 
-const noVNCZip = "https://github.com/novnc/noVNC/archive/refs/tags/v1.5.0.zip"
+const noVNCZip = "https://github.com/novnc/noVNC/archive/refs/tags/v1.7.0.zip"
 const vncScript = ""
+
+// normalizeSemver normalizes a semver string by removing any pre-release or build metadata.
+// v1.1.0-hotfix1 -> v1.1.0
+// v1.5.0 -> v1.5.0
+// v2.0.3+build.7 -> v2.0.3
+func normalizeSemver(v string) (string, error) {
+	// Remove pre-release and build metadata
+	if i := strings.IndexAny(v, "-+"); i != -1 {
+		v = v[:i]
+	}
+
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid semver: %s", v)
+	}
+
+	return strings.Join(parts, "."), nil
+}
 
 func main() {
 	resp, err := http.Get(noVNCZip)
