@@ -148,8 +148,6 @@
             var pathname = document.location.pathname;
             // Remove all trailing slashes in pathname
             addr = pathname.replace(/\/?$/, '/') + addr;
-            // Remove all leading slashes in addr
-            addr = addr.replace(/^(\/)+/, "");
             path.value = addr;
         }
 
